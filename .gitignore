@@ -1,0 +1,43 @@
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+rl_env/
+phf_env/
+
+# Local training outputs
+results_stage2_smoke/
+server_runs*/
+logs*/
+checkpoints_vector/
+checkpoints_stage2*/
+logs_stage2*/
+server_runs_stage2*/
+stage2_generated_configs/
+
+# Large server artifact folders and archives
+*_artifacts/
+*_artifacts.tar
+*_artifacts.tar.gz
+*.zip
+
+# Runtime result folders, except reference metrics kept in repo
+results/*
+!results/reference_metrics/
+!results/reference_metrics/**
+
+# Keep the representative checkpoint included with this repository
+checkpoints/*
+!checkpoints/stage2_channel_v3_gpu2_best.pt
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

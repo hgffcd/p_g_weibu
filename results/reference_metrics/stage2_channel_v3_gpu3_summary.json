@@ -1,0 +1,19 @@
+{
+  "episodes": 300.0,
+  "average_step_reward": -1.3079450360327565,
+  "encirclement_time": 18.224333333333334,
+  "danger_rate": 0.0,
+  "success_rate": 1.0,
+  "collision_rate": 0.0,
+  "timeout_rate": 0.0,
+  "final_distance_error": 0.0275177412054098,
+  "final_angle_error": 0.0693884559476711,
+  "min_obstacle_clearance": 0.4186359243793305,
+  "min_pursuer_clearance": 0.4269124997934043,
+  "bidirectional_meta_messages": 120.0,
+  "fully_connected_meta_messages": 170.0,
+  "communication_reduction": 0.2941176470588235,
+  "scenario": "randomized",
+  "policy": "checkpoint",
+  "guide": "channel"
+}
