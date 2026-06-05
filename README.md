@@ -34,6 +34,312 @@
 
 更多 GIF 位于 [assets](assets)。
 
+## 数学建模
+
+### 平面运动模型
+
+原论文涉及模型车和仿真平台；本工程按用户要求简化为二维平面圆形环境。第 `i` 个追捕者的位置、速度和动作分别为：
+
+```math
+p_i(t) = [x_i(t), y_i(t)]^\top,\quad
+v_i(t) = [v_{x,i}(t), v_{y,i}(t)]^\top,\quad
+a_i(t) = [a_{x,i}(t), a_{y,i}(t)]^\top
+```
+
+使用离散二阶积分近似状态转移：
+
+```math
+v_i(t+1) = \operatorname{clip}(v_i(t) + a_i(t)\Delta t,\ -v_{\max},\ v_{\max})
+```
+
+```math
+p_i(t+1) = p_i(t) + v_i(t+1)\Delta t
+```
+
+其中 `clip` 用于速度限制，动作也会被限制在最大加速度范围内：
+
+```math
+\|a_i(t)\|_\infty \le a_{\max}
+```
+
+目标位置和速度记为 `p_T(t), v_T(t)`。当前主线支持固定目标和低速移动目标，但不复现原论文的真实车辆动力学。
+
+### 围捕判定
+
+围捕目标是让 `N` 个追捕者在目标周围形成近似等角度环形队形。设期望围捕半径为 `R_c`，追捕者相对目标的距离为：
+
+```math
+d_i(t) = \|p_i(t) - p_T(t)\|_2
+```
+
+距离误差：
+
+```math
+e_d(t) = \frac{1}{N}\sum_{i=1}^{N} |d_i(t) - R_c|
+```
+
+追捕者相对目标的极角：
+
+```math
+\theta_i(t) = \operatorname{atan2}(y_i(t)-y_T(t), x_i(t)-x_T(t))
+```
+
+排序后的相邻角度间隔应接近：
+
+```math
+\Delta\theta^\* = \frac{2\pi}{N}
+```
+
+角度误差近似为：
+
+```math
+e_\theta(t) =
+\frac{1}{N}\sum_{i=1}^{N}
+\left|\operatorname{wrap}(\theta_{i+1}(t)-\theta_i(t))-\frac{2\pi}{N}\right|
+```
+
+当距离误差、角度误差均小于阈值，并且无追捕者碰撞、无障碍物碰撞时，判定为围捕成功：
+
+```math
+e_d(t) \le \epsilon_d,\quad
+e_\theta(t) \le \epsilon_\theta,\quad
+\text{collision}(t)=0
+```
+
+### 碰撞与安全距离
+
+追捕者和障碍物均为圆。追捕者半径为 `r_p`，障碍物半径为 `r_o`。追捕者间碰撞条件：
+
+```math
+\|p_i - p_j\|_2 \le 2r_p,\quad i \ne j
+```
+
+追捕者与障碍物碰撞条件：
+
+```math
+\|p_i - p_o\|_2 \le r_p + r_o
+```
+
+评估中还记录最小障碍物净空和最小追捕者间净空，用来判断策略是否只是“擦边成功”。
+
+## 策略引导方法
+
+代码中实现了两类引导：
+
+- `APFGuidePolicy`：人工势场风格策略。
+- `Stage2ChannelGuidePolicy`：在 APF 基础上加入障碍带通道 waypoint，使追捕者先绕过障碍区域，再回到围捕队形。
+
+APF 引导可以抽象为：
+
+```math
+a_i^{guide}
+= a_i^{target} + a_i^{formation} + a_i^{obstacle} + a_i^{safety}
+```
+
+目标吸引项使追捕者靠近目标或目标附近的围捕槽位：
+
+```math
+a_i^{target} = k_t(p_i^{slot} - p_i) - k_v(v_i - v_T)
+```
+
+障碍物斥力项在追捕者进入障碍影响范围 `d_0` 后生效：
+
+```math
+a_{i,o}^{obstacle}
+= k_o\left(\frac{1}{d_{i,o}}-\frac{1}{d_0}\right)
+\frac{p_i-p_o}{d_{i,o}^3},\quad d_{i,o}<d_0
+```
+
+其中：
+
+```math
+d_{i,o} = \|p_i - p_o\|_2
+```
+
+Stage-2 channel guide 不是论文额外声明的公式，而是工程近似：在障碍物带附近为不同排序的追捕者分配通道点，先引导其通过障碍区域，再切换回围捕槽位控制。
+
+## 强化学习理论方法
+
+### Dec-POMDP 建模
+
+该问题被实现为多智能体部分可观测强化学习任务，可近似表示为 Dec-POMDP：
+
+```math
+\mathcal{M} =
+\langle
+\mathcal{S},
+\{\mathcal{A}_i\}_{i=1}^{N},
+\{\mathcal{O}_i\}_{i=1}^{N},
+P,
+\{R_i\}_{i=1}^{N},
+\gamma
+\rangle
+```
+
+其中：
+
+- `S`：全局状态，包括全部追捕者、目标和障碍物的位置/速度。
+- `O_i`：第 `i` 个追捕者的局部观测，包括自身状态、目标相对位置/速度、其他追捕者相对信息、障碍物相对信息。
+- `A_i`：第 `i` 个追捕者的二维连续加速度动作。
+- `P`：由二维积分动力学和目标运动规则定义的状态转移。
+- `R_i`：围捕奖励、碰撞惩罚、距离/角度 shaping 奖励。
+- `γ`：折扣因子。
+
+训练采用集中式训练、分布式执行思想：critic 可以使用拼接后的全局观测，actor 在执行时按每个智能体的局部观测输出动作。
+
+### residual policy
+
+当前主线不是让神经网络从零输出全部动作，而是学习引导策略的残差修正：
+
+```math
+a_i(t) = a_i^{guide}(t) + \lambda a_i^{\pi}(t)
+```
+
+其中 `a_i^{guide}` 来自 APF/channel guide，`a_i^{\pi}` 来自策略网络，`λ` 是 residual scale。这样做的目的在于降低强化学习早期探索难度。
+
+### 策略网络与动作分布
+
+actor 输出连续动作分布的均值，动作采样近似为高斯策略：
+
+```math
+\pi_\theta(a_i|o_i)
+= \mathcal{N}(\mu_\theta(o_i, h_i), \sigma_\theta)
+```
+
+其中 `h_i` 是循环网络隐状态。评估和可视化时使用 deterministic action，即取均值动作。
+
+critic 估计状态价值：
+
+```math
+V_\phi(s_t) \approx \mathbb{E}_{\pi_\theta}
+\left[\sum_{k=0}^{\infty}\gamma^k r_{t+k}\right]
+```
+
+### 回报、优势函数和 GAE
+
+强化学习目标是最大化折扣累计回报：
+
+```math
+J(\theta)=
+\mathbb{E}_{\pi_\theta}
+\left[
+\sum_{t=0}^{T-1}\gamma^t r_t
+\right]
+```
+
+TD 残差：
+
+```math
+\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)
+```
+
+GAE 优势估计：
+
+```math
+\hat{A}_t =
+\sum_{l=0}^{T-t-1}
+(\gamma\lambda_{gae})^l\delta_{t+l}
+```
+
+### PPO / MAPPO 更新
+
+记新旧策略概率比为：
+
+```math
+\rho_t(\theta)=
+\frac{\pi_\theta(a_t|o_t)}
+{\pi_{\theta_{old}}(a_t|o_t)}
+```
+
+PPO clipped actor loss：
+
+```math
+L^{clip}(\theta)=
+\mathbb{E}_t
+\left[
+\min
+\left(
+\rho_t(\theta)\hat{A}_t,\ 
+\operatorname{clip}(\rho_t(\theta),1-\epsilon,1+\epsilon)\hat{A}_t
+\right)
+\right]
+```
+
+critic 使用均方误差：
+
+```math
+L_V(\phi)=
+\mathbb{E}_t
+\left[
+\left(V_\phi(s_t)-\hat{R}_t\right)^2
+\right]
+```
+
+总体优化目标包含 actor loss、critic loss、entropy bonus，以及可选的行为克隆项：
+
+```math
+L =
+-L^{clip}
+c_vL_V
+-c_e\mathcal{H}(\pi_\theta)
+c_{bc}L_{BC}
+```
+
+行为克隆项用于训练早期贴近引导策略：
+
+```math
+L_{BC} =
+\mathbb{E}_t
+\left[
+\|a_t^\pi - a_t^{guide}\|_2^2
+\right]
+```
+
+### 奖励设计
+
+奖励由任务进展、围捕成功、碰撞惩罚和 shaping 项组成。代码中的工程形式可概括为：
+
+```math
+r_t =
+w_d r_d(t)
++ w_\theta r_\theta(t)
++ r_{success}(t)
++ r_{collision}(t)
++ r_{step}
+```
+
+距离 shaping：
+
+```math
+r_d(t) = -e_d(t)
+```
+
+角度 shaping：
+
+```math
+r_\theta(t) = -e_\theta(t)
+```
+
+成功奖励与碰撞惩罚：
+
+```math
+r_{success} =
+\begin{cases}
+R_s, & \text{if encirclement succeeds}\\
+0, & \text{otherwise}
+\end{cases}
+```
+
+```math
+r_{collision} =
+\begin{cases}
+-R_c, & \text{if collision occurs}\\
+0, & \text{otherwise}
+\end{cases}
+```
+
+这部分是论文奖励思想在简化平面环境中的工程实现；具体权重见对应 YAML 配置。
+
 ## 不能实现或不能保证的效果
 
 当前版本不能保证：
