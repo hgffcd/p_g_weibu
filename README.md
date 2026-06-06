@@ -49,7 +49,7 @@ a_i(t) = [a_{x,i}(t), a_{y,i}(t)]^\top
 使用离散二阶积分近似状态转移：
 
 ```math
-v_i(t+1) = \operatorname{clip}(v_i(t) + a_i(t)\Delta t,\ -v_{\max},\ v_{\max})
+v_i(t+1) = \mathrm{clip}(v_i(t) + a_i(t)\Delta t,\ -v_{\max},\ v_{\max})
 ```
 
 ```math
@@ -81,7 +81,7 @@ e_d(t) = \frac{1}{N}\sum_{i=1}^{N} |d_i(t) - R_c|
 追捕者相对目标的极角：
 
 ```math
-\theta_i(t) = \operatorname{atan2}(y_i(t)-y_T(t), x_i(t)-x_T(t))
+\theta_i(t) = \mathrm{atan2}(y_i(t)-y_T(t), x_i(t)-x_T(t))
 ```
 
 排序后的相邻角度间隔应接近：
@@ -95,7 +95,7 @@ e_d(t) = \frac{1}{N}\sum_{i=1}^{N} |d_i(t) - R_c|
 ```math
 e_\theta(t) =
 \frac{1}{N}\sum_{i=1}^{N}
-\left|\operatorname{wrap}(\theta_{i+1}(t)-\theta_i(t))-\frac{2\pi}{N}\right|
+\left|\mathrm{wrap}(\theta_{i+1}(t)-\theta_i(t))-\frac{2\pi}{N}\right|
 ```
 
 当距离误差、角度误差均小于阈值，并且无追捕者碰撞、无障碍物碰撞时，判定为围捕成功：
@@ -260,7 +260,7 @@ L^{clip}(\theta)=
 \min
 \left(
 \rho_t(\theta)\hat{A}_t,\ 
-\operatorname{clip}(\rho_t(\theta),1-\epsilon,1+\epsilon)\hat{A}_t
+\mathrm{clip}(\rho_t(\theta),1-\epsilon,1+\epsilon)\hat{A}_t
 \right)
 \right]
 ```
