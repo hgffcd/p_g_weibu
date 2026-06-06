@@ -1,6 +1,8 @@
 # Policy-Guided Multi-Agent Encirclement Control
 
-这是论文 **A Policy-Guided Reinforcement Learning Method for Encirclement Control in Multiobstacle Environment** 的代码复现工程。
+这是论文 **《多障碍环境下围捕控制的策略引导强化学习方法》** 的代码复现工程。
+
+本项目由 AI 协助完成论文解析、工程设计、代码实现、实验结果整理与项目说明编写，欢迎通过 issue 或 pull request 改进该项目。
 
 本仓库不是原论文的模型车/ROS/Gazebo 完整仿真复刻，而是按照论文核心思想实现的二维平面圆形环境版本：追捕者、目标和障碍物均建模为圆，重点复现“策略引导 + 强化学习围捕”的算法流程。
 
